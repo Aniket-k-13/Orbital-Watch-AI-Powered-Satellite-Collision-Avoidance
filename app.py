@@ -27,8 +27,8 @@ CONFIG = {
     # ── Space-Track.org credentials ──
     # Register FREE at https://www.space-track.org/auth/createAccount
     # Fill these in once you have an account — leave blank to use Celestrak only
-    "SPACETRACK_USER": "aniket.khandare24@vit.edu",   # ← paste your email here
-    "SPACETRACK_PASS": "aniketkhandare7350",   # ← paste your password here
+    "SPACETRACK_USER": "",   # ← paste your email here
+    "SPACETRACK_PASS": "",   # ← paste your password here
 
     # ── Space-Track settings ──
     "ST_CDM_DAYS_BACK":  7,      # fetch CDMs from last N days
