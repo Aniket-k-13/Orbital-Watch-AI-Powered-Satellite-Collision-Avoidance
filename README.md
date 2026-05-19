@@ -17,7 +17,6 @@ venv\Scripts\activate
 pip install -r requirements.txt
 python app.py
 ```
-
 ---
 
 ## What This System Does
@@ -113,7 +112,6 @@ orbital-watch/
 ├── satellite_watch.db    ← SQLite (auto-created)
 └── README.md
 ```
-
 ---
 
 ## Tech Stack
@@ -135,7 +133,6 @@ orbital-watch/
 - Objects under ~10cm not in any public catalog
 
 ---
-
 ## Portfolio Talking Points
 > "Ingests live TLE data for 300+ objects, propagates 24h forward with SGP4,
 > screens ~25,000 altitude-compatible pairs for close approaches, computes
