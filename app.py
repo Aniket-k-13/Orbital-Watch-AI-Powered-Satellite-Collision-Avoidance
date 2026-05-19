@@ -963,6 +963,8 @@ def _synthetic_conjunction(tles):
 # ============================================================
 
 # ── Load ML risk model if available ──
+import os as _os
+_os.environ.setdefault("MPLBACKEND", "Agg")  # suppress matplotlib GUI
 import pickle as _pickle
 
 _ML_MODEL = None
