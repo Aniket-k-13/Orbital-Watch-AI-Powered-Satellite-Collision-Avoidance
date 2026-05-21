@@ -5,12 +5,15 @@
 
 ## Quick Start (Windows)
 ```
+
 1. Double-click  setup_and_run.bat
 2. Wait ~60–90 seconds for the orbital scan
 3. Open browser → http://localhost:5000
+
 ```
 
 ## Manual Setup
+
 ```bash
 python -m venv venv
 venv\Scripts\activate
@@ -20,6 +23,7 @@ python app.py
 ---
 
 ## What This System Does
+
 
 | Layer | What happens |
 |---|---|
