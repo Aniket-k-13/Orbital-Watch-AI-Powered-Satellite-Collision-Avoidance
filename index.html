@@ -271,46 +271,48 @@ body { font-family: var(--sans); background: var(--bg); color: var(--t1); }
 #conj-list::-webkit-scrollbar-thumb { background: var(--b1); border-radius: 2px; }
 
 .ci {
-  padding: 10px 14px 10px 16px;
+  padding: 7px 14px 7px 16px;
   border-left: 3px solid transparent;
   border-bottom: 1px solid var(--b0);
   cursor: pointer; transition: background .12s, border-color .12s;
 }
-.ci:hover { background: rgba(0,229,255,.03); border-left-color: var(--b1); }
-.ci.active { background: rgba(0,229,255,.06); border-left-color: var(--cyan); }
+.ci:hover  { background: rgba(0,229,255,.03); border-left-color: var(--b1); }
+.ci.active { background: rgba(0,229,255,.07); border-left-color: var(--cyan); }
 
-/* risk pill */
+/* risk pill — compact */
 .rp-pill {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-family: var(--mono); font-size: .48rem; font-weight: 700;
-  letter-spacing: .1em; padding: 2px 8px; border-radius: 100px;
-  margin-bottom: 6px;
+  display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
+  font-family: var(--mono); font-size: .44rem; font-weight: 700;
+  letter-spacing: .08em; padding: 1px 6px; border-radius: 100px;
 }
-.rp-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.rp-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
 .rC { color: var(--red);    background: rgba(255,59,59,.12);    border: 1px solid rgba(255,59,59,.3); }
 .rH { color: var(--amber);  background: rgba(255,179,0,.12);    border: 1px solid rgba(255,179,0,.3); }
 .rM { color: var(--purple); background: rgba(170,95,255,.12);   border: 1px solid rgba(170,95,255,.3); }
 .rL { color: var(--green);  background: rgba(0,230,118,.08);    border: 1px solid rgba(0,230,118,.2); }
 .rG { color: var(--orange); background: rgba(255,109,0,.12);    border: 1px solid rgba(255,109,0,.3); }
-.geo-tag { font-family: var(--mono); font-size: .46rem; color: var(--orange);
+
+.geo-tag { font-family: var(--mono); font-size: .44rem; color: var(--orange);
   background: rgba(255,109,0,.1); border: 1px solid rgba(255,109,0,.25);
-  padding: 1px 5px; border-radius: 100px; margin-left: 4px; }
-.synth { font-family: var(--mono); font-size: .46rem; color: var(--amber);
+  padding: 1px 4px; border-radius: 100px; }
+.synth { font-family: var(--mono); font-size: .44rem; color: var(--amber);
   background: rgba(255,179,0,.1); border: 1px solid rgba(255,179,0,.25);
-  padding: 1px 5px; border-radius: 100px; margin-left: 4px; }
+  padding: 1px 4px; border-radius: 100px; }
 
-.ci-names { font-size: .78rem; font-weight: 600; color: var(--t1); line-height: 1.35; margin-bottom: 2px; }
-.ci-threat { font-family: var(--mono); font-size: .58rem; color: var(--red); margin-bottom: 6px; }
+/* Compact 2-row card */
+.ci-row1 {
+  display: flex; align-items: center; gap: 5px;
+  margin-bottom: 3px; overflow: hidden;
+}
+.ci-sat1 { font-family: var(--sans); font-size: .72rem; font-weight: 600; color: var(--amber); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
+.ci-arrow { color: var(--t3); font-size: .65rem; flex-shrink: 0; }
+.ci-sat2 { font-family: var(--sans); font-size: .7rem; color: var(--red); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 
-.ci-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
-.ci-metric .mk { font-family: var(--mono); font-size: .44rem; color: var(--t3); letter-spacing: .08em; margin-bottom: 1px; }
-.ci-metric .mv { font-family: var(--mono); font-size: .68rem; color: var(--cyan); font-weight: 500; }
-
-/* ML confidence bar */
-.ml-bar-wrap { margin-top: 5px; display: flex; align-items: center; gap: 6px; }
-.ml-label { font-family: var(--mono); font-size: .44rem; color: var(--t3); white-space: nowrap; }
-.ml-bar { flex: 1; height: 3px; background: var(--b0); border-radius: 1px; overflow: hidden; }
-.ml-fill { height: 100%; border-radius: 1px; transition: width .8s ease; }
+.ci-row2 {
+  display: flex; gap: 10px; align-items: center;
+}
+.ci-m2 { font-family: var(--mono); font-size: .58rem; color: var(--t2); white-space: nowrap; }
+.ci-mk { color: var(--t3); font-size: .5rem; }
 
 /* History */
 #hist-btn {
@@ -752,20 +754,32 @@ let conjEntities=[],dotEntities=[],initialized=false,selectedIdx=-1;
 let conjData=[],activeFilter='ALL',histOpen=false;
 let activeTcaMinutes=null,tcaSetAt=null,_lastConj=null,_lastManeuver=null;
 
+let _lastScanComplete = null;
+
 function poll(){
   fetch('/api/status')
     .then(r=>r.json())
     .then(data=>{
       const t=document.getElementById('ld-txt');
       if(data.is_loading){
-        if(t) t.textContent='running orbital scan — please wait...';
+        if(t) t.textContent='running orbital scan — please wait…';
       } else {
+        // Hide loader and init Cesium on first load
         if(!initialized){
           initialized=true;
           const loader=document.getElementById('loader');
           if(loader) loader.classList.add('hidden');
           initCesium();
           loadAll();
+          _lastScanComplete = data.stats && data.stats.last_updated;
+        } else {
+          // If a NEW scan just completed (timestamp changed), reload data
+          const newTs = data.stats && data.stats.last_updated;
+          if(newTs && newTs !== _lastScanComplete){
+            _lastScanComplete = newTs;
+            console.log('New scan detected, reloading data...');
+            loadAll();
+          }
         }
         if(data.stats) updateTopbar(data.stats);
       }
@@ -871,9 +885,155 @@ function updateAnalyticsBar(stats,conjList){
   }).catch(()=>{});
 }
 
+// ══════════════════════════════════════════════════════
+// ANIMATED SATELLITE — moves along orbit in real time
+// ══════════════════════════════════════════════════════
+let _animEntities = [];
+let _animTimer    = null;
+
+function clearAnim(){
+  _animEntities.forEach(e=>{try{viewer.entities.remove(e);}catch(_){}});
+  _animEntities=[];
+  if(_animTimer){ clearInterval(_animTimer); _animTimer=null; }
+}
+
+function animateSatelliteOnPath(data){
+  if(!cesiumReady||!viewer) return;
+  clearAnim();
+
+  const satPath = data.paths && data.paths.satellite;
+  const debPath = data.paths && data.paths.debris;
+  if(!satPath||!satPath.length||!debPath||!debPath.length) return;
+
+  const stepMs   = 5 * 60 * 1000;  // 5 min per step
+  const startMs  = Date.now();
+  const totalMs  = satPath.length * stepMs;
+
+  // Satellite moving dot — gold, larger
+  const satEnt = viewer.entities.add({
+    position: new Cesium.CallbackProperty(()=>{
+      const elapsed = (Date.now() - startMs) % totalMs;
+      const idx     = Math.floor(elapsed / stepMs);
+      const i       = Math.min(idx, satPath.length-1);
+      return eciToC3(satPath[i], startMs + i*stepMs);
+    }, false),
+    point:{
+      pixelSize: 12,
+      color: Cesium.Color.fromCssColorString('#FFB300'),
+      outlineColor: Cesium.Color.WHITE,
+      outlineWidth: 2,
+      disableDepthTestDistance: Infinity,
+      scaleByDistance: new Cesium.NearFarScalar(1e4,2,1e7,0.8),
+    }
+  });
+  _animEntities.push(satEnt);
+
+  // Debris moving dot — red, slightly smaller
+  const debEnt = viewer.entities.add({
+    position: new Cesium.CallbackProperty(()=>{
+      const elapsed = (Date.now() - startMs) % totalMs;
+      const idx     = Math.floor(elapsed / stepMs);
+      const i       = Math.min(idx, debPath.length-1);
+      return eciToC3(debPath[i], startMs + i*stepMs);
+    }, false),
+    point:{
+      pixelSize: 10,
+      color: Cesium.Color.fromCssColorString('#FF3B3B'),
+      outlineColor: Cesium.Color.WHITE,
+      outlineWidth: 2,
+      disableDepthTestDistance: Infinity,
+      scaleByDistance: new Cesium.NearFarScalar(1e4,2,1e7,0.8),
+    }
+  });
+  _animEntities.push(debEnt);
+
+  // Live TCA countdown line — appears when objects are close
+  const tcaMs  = Date.now() + data.tca_minutes_from_now*60000;
+  const warnMs = 10 * 60 * 1000; // show warning 10 min before TCA
+  const warnEntity = viewer.entities.add({
+    show: new Cesium.CallbackProperty(()=>{
+      const now = Date.now();
+      return now >= tcaMs - warnMs && now <= tcaMs + 5*60000;
+    }, false),
+    position: new Cesium.CallbackProperty(()=>{
+      const elapsed = (Date.now() - startMs) % totalMs;
+      const idx = Math.floor(elapsed / stepMs);
+      const i   = Math.min(idx, satPath.length-1);
+      return eciToC3(satPath[i], startMs + i*stepMs);
+    }, false),
+    point:{
+      pixelSize: 20,
+      color: Cesium.Color.RED.withAlpha(0.6),
+      outlineColor: Cesium.Color.RED,
+      outlineWidth: 3,
+      disableDepthTestDistance: Infinity,
+    }
+  });
+  _animEntities.push(warnEntity);
+}
+
+// ══════════════════════════════════════════════════════
+// REAL SCENARIO EXPLAINER — shown in right panel
+// ══════════════════════════════════════════════════════
+function getRealScenarioText(conj){
+  const miss    = conj.miss_distance.toFixed(1);
+  const tca     = fmtTCA(conj.tca_minutes_from_now);
+  const sat1    = (conj.sat1_name||'SAT').replace('DEMO','').trim();
+  const sat2    = conj.sat2_name||'OBJ';
+  const pc      = conj.probability_of_collision||0;
+  const isDebris= (conj.sat2_type||'').includes('DEBRIS') || sat2.includes('DEB');
+
+  let urgency = 'LOW';
+  let action  = 'No action needed — continue monitoring.';
+  let color   = 'var(--green)';
+
+  if(pc > 1e-4 || conj.miss_distance < 5){
+    urgency = 'CRITICAL'; color='var(--red)';
+    action = 'IMMEDIATE maneuver required. Contact operator.';
+  } else if(pc > 1e-5 || conj.miss_distance < 15){
+    urgency = 'HIGH'; color='var(--amber)';
+    action = 'Maneuver planning should begin now.';
+  } else if(pc > 1e-6 || conj.miss_distance < 30){
+    urgency = 'MEDIUM'; color='var(--purple)';
+    action = 'Monitor closely. Prepare contingency maneuver.';
+  }
+
+  const objType = isDebris
+    ? 'a piece of <span style="color:var(--red)">space debris</span>'
+    : 'an active <span style="color:var(--amber)">satellite</span>';
+
+  return '<div style="font-family:var(--mono);font-size:.58rem;line-height:2;'
+    +'background:rgba(0,0,0,.3);border:1px solid var(--b1);border-radius:5px;'
+    +'padding:12px 14px;margin-bottom:12px">'
+    +'<div style="color:var(--cyan);font-size:.52rem;letter-spacing:.15em;margin-bottom:8px">&#127758; REAL SCENARIO</div>'
+    +'<b style="color:var(--t1)">'+sat1+'</b> is on a trajectory that will bring it within '
+    +'<b style="color:var(--red)">'+miss+' km</b> of '+objType+' ('
+    +sat2+') in approximately <b style="color:var(--amber)">'+tca+'</b>.<br><br>'
+    +'At orbital speeds (~7.8 km/s), this gap is crossed in under 5 seconds — '
+    +'which is why even a '+miss+' km separation is tracked.<br><br>'
+    +'<div style="border-top:1px solid var(--b1);margin-top:8px;padding-top:8px">'
+    +'<span style="color:'+color+';font-weight:bold">'+urgency+'</span> — '+action
+    +'</div></div>';
+}
+
+
 poll();
 setInterval(poll,5000);
-setInterval(()=>{if(initialized&&cesiumReady) refreshGlobe();},30000);
+// Animate satellites every 10 seconds (real orbital motion)
+setInterval(()=>{if(initialized&&cesiumReady) refreshGlobe();},10000);
+// Fast position animation using clock
+let _globeObjects = [];
+let _animClock = null;
+
+function startOrbitalAnimation(objects){
+  _globeObjects = objects;
+  if(_animClock) clearInterval(_animClock);
+  // Update dot positions every 30s (smooth enough, not too heavy)
+  _animClock = setInterval(()=>{
+    if(!cesiumReady||!viewer||!_globeObjects.length) return;
+    renderDots(_globeObjects);
+  }, 30000);
+}
 setInterval(()=>{if(initialized) loadAll();},5*60*1000);
 
 /* CESIUM — only after backend is ready */
@@ -968,21 +1128,26 @@ function afterLoadAll(stats, conjList){
   try{ updateAnalyticsBar(stats, conjList); } catch(e){}
 }
 
+let _highlightIds = new Set();  // NORAD IDs to highlight
+
 function renderDots(objects){
   if(!cesiumReady||!viewer)return;
   clearDots();
   const now=Date.now();
   objects.forEach(o=>{
     try{
-      const isDebris=o.type==='DEBRIS';
-      const isGeo=o.is_geo||false;
+      const isDebris = o.type==='DEBRIS';
+      const isGeo    = o.is_geo||false;
+      const isActive = _highlightIds.size===0 || _highlightIds.has(o.id);
+      const alpha    = isActive ? (isGeo?0.7:isDebris?0.55:0.45) : 0.08;
+      const size     = isActive ? (isGeo?5:isDebris?3:4) : 2;
       let dotColor;
-      if(isGeo) dotColor=Cesium.Color.fromCssColorString('#FF6D00').withAlpha(0.7);
-      else if(isDebris) dotColor=Cesium.Color.fromCssColorString('#FF5555').withAlpha(0.55);
-      else dotColor=Cesium.Color.fromCssColorString('#00E5FF').withAlpha(0.45);
+      if(isGeo)         dotColor = Cesium.Color.fromCssColorString('#FF6D00').withAlpha(alpha);
+      else if(isDebris) dotColor = Cesium.Color.fromCssColorString('#FF5555').withAlpha(alpha);
+      else              dotColor = Cesium.Color.fromCssColorString('#00E5FF').withAlpha(alpha);
       dotEntities.push(viewer.entities.add({
-        position:eciToC3(o.pos,now),
-        point:{pixelSize:isGeo?5:(isDebris?3:4),color:dotColor,disableDepthTestDistance:Infinity},
+        position: eciToC3(o.pos,now),
+        point: {pixelSize:size, color:dotColor, disableDepthTestDistance:Infinity},
       }));
     }catch(_){}
   });
@@ -1161,10 +1326,14 @@ function initTouchpadZoom(){
 
 function resetView(){
   autoRotate=true;updateRotateBtn();clearConj();activeTcaMinutes=null;
+  _highlightIds = new Set();  // clear dimming
+  clearAnim();  // stop satellite animation
   if(cesiumReady&&viewer) viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(20.0,20.0,22000000),duration:1.5});
   document.querySelectorAll('.ci').forEach(el=>el.classList.remove('active'));
   const rp=document.getElementById('rp-scroll');if(rp) rp.innerHTML=emptyPanel();
   selectedIdx=-1;
+  // Re-render dots normally
+  fetch('/api/globe').then(r=>r.json()).then(gd=>{if(gd&&gd.objects) renderDots(gd.objects);}).catch(()=>{});
 }
 
 function toggleRotate(){autoRotate=!autoRotate;updateRotateBtn();}
@@ -1333,21 +1502,22 @@ function showDetailBase(conj,idx){
   const rc=riskDvClass(conj.risk_level);
   const s=conj.is_synthetic?'<span class="synth">DEMO</span>':'';
   const o1=conj.sat1_orbital||{},o2=conj.sat2_orbital||{};
+  // Human-readable labels with tooltips
   const rows=[
-    ['Satellite',(conj.sat1_name||'').replace('DEMO','').trim()],
-    ['Threat',conj.sat2_name||''],
-    ['Time to TCA','<span id="tca-live" style="color:var(--amber)">'+fmtTCA(conj.tca_minutes_from_now)+'</span>'],
-    ['Rel. Velocity',(conj.relative_velocity||0).toFixed(3)+' km/s'],
-    ['Risk Level','<span class="dv '+rc+'">'+conj.risk_level+'</span>'],
-    ['Pc (Foster)','<span class="dv '+rc+'">'+fmtPc(conj.probability_of_collision)+'</span>'],
+    ['&#128752; Satellite',     (conj.sat1_name||'').replace('DEMO','').trim()],
+    ['&#9762; Threat Object',   conj.sat2_name||''],
+    ['&#9201; Time to TCA',     '<span id="tca-live" style="color:var(--amber)">'+fmtTCA(conj.tca_minutes_from_now)+'</span><span style="color:var(--t3);font-size:.5rem;margin-left:5px">(closest approach)</span>'],
+    ['&#11012; Rel. Speed',     (conj.relative_velocity||0).toFixed(3)+' km/s <span style="color:var(--t3);font-size:.5rem">(closing speed)</span>'],
+    ['&#9888; Risk Level',      '<span class="dv '+rc+'">'+conj.risk_level+'</span>'],
+    ['&#127914; Collision Prob','<span class="dv '+rc+'">'+fmtPc(conj.probability_of_collision)+'</span><span style="color:var(--t3);font-size:.5rem;margin-left:5px">(Foster 1992)</span>'],
   ];
   const oeGrid='<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;margin-bottom:10px">'+
-    [['SAT INC',(o1.inclination||'-')+'deg','var(--cyan)'],
-     ['DEB INC',(o2.inclination||'-')+'deg','var(--red)'],
-     ['SAT ALT',(o1.altitude_km||'-')+' km','var(--cyan)'],
-     ['DEB ALT',(o2.altitude_km||'-')+' km','var(--red)'],
-     ['SAT PERIOD',(o1.period_min||'-')+' min','var(--text)'],
-     ['DEB PERIOD',(o2.period_min||'-')+' min','var(--text)'],
+    [['SAT Inclination',(o1.inclination||'\u2014')+'\u00b0','var(--cyan)'],
+     ['DEB Inclination',(o2.inclination||'\u2014')+'\u00b0','var(--red)'],
+     ['SAT Altitude',(o1.altitude_km||'\u2014')+' km','var(--cyan)'],
+     ['DEB Altitude',(o2.altitude_km||'\u2014')+' km','var(--red)'],
+     ['SAT Orbit Period',(o1.period_min||'\u2014')+' min','var(--t1)'],
+     ['DEB Orbit Period',(o2.period_min||'\u2014')+' min','var(--t1)'],
     ].map(([k,v,col])=>'<div style="padding:6px 0"><div style="font-family:var(--mono);font-size:0.5rem;color:var(--muted);margin-bottom:2px">'+k+'</div><div style="font-family:var(--mono);font-size:0.72rem;color:'+col+'">'+v+'</div></div>').join('')+'</div>';
   document.getElementById('rp-scroll').innerHTML=
     '<div class="sec"><div class="sec-title"><span class="dot"></span>Conjunction '+s+'</div>'
@@ -1355,6 +1525,7 @@ function showDetailBase(conj,idx){
     +'<div class="miss-vs"><span class="n1">'+(conj.sat1_name||'SAT').replace('DEMO','').trim()+'</span> vs <span class="n2">'+(conj.sat2_name||'THREAT')+'</span></div>'
     +'<div class="miss-num">'+conj.miss_distance.toFixed(2)+'<span class="miss-unit"> km</span></div>'
     +'<div class="miss-label">MISS DISTANCE AT CLOSEST APPROACH</div></div>'
+    +'<div id="scenario-box"></div>'
     +'<div class="geom-wrap"><canvas id="geom-canvas" width="270" height="110"></canvas></div>'
     +rows.map(([k,v])=>'<div class="dr"><div class="dk">'+k+'</div><div class="dv" style="font-size:.7rem;text-align:right;max-width:180px">'+v+'</div></div>').join('')
     +'</div>'
@@ -1368,14 +1539,23 @@ function showDetailBase(conj,idx){
       ['DEB PERIOD',(o2.period_min||'—')+' min','var(--t1)'],
     ].map(([k,v,col])=>'<div class="oe-cell"><div class="oe-k">'+k+'</div><div class="oe-v" style="color:'+col+'">'+v+'</div></div>').join('')
     +'</div>'
-    +'<div class="ctx-bar"><div class="ctx-lbl">Altitude</div><div class="ctx-track"><div class="ctx-fill" id="rb-alt" style="width:0%;background:var(--cyan)"></div></div><div class="ctx-val" style="color:var(--cyan)" id="rv-alt">—</div></div>'
-    +'<div class="ctx-bar"><div class="ctx-lbl">Velocity</div><div class="ctx-track"><div class="ctx-fill" id="rb-vel" style="width:0%;background:var(--purple)"></div></div><div class="ctx-val" style="color:var(--purple)" id="rv-vel">—</div></div>'
-    +'<div class="ctx-bar"><div class="ctx-lbl">Urgency</div><div class="ctx-track"><div class="ctx-fill" id="rb-urg" style="width:0%;background:var(--amber)"></div></div><div class="ctx-val" style="color:var(--amber)" id="rv-urg">—</div></div>'
+    +'<div class="ctx-bar"><div class="ctx-lbl" title="Orbit altitude above Earth surface">Alt</div><div class="ctx-track"><div class="ctx-fill" id="rb-alt" style="width:0%;background:var(--cyan)"></div></div><div class="ctx-val" style="color:var(--cyan)" id="rv-alt">—</div></div>'
+    +'<div class="ctx-bar"><div class="ctx-lbl" title="Orbital velocity in km/s">Vel</div><div class="ctx-track"><div class="ctx-fill" id="rb-vel" style="width:0%;background:var(--purple)"></div></div><div class="ctx-val" style="color:var(--purple)" id="rv-vel">—</div></div>'
+    +'<div class="ctx-bar"><div class="ctx-lbl" title="How soon TCA occurs (% of 24h)">Urgency</div><div class="ctx-track"><div class="ctx-fill" id="rb-urg" style="width:0%;background:var(--amber)"></div></div><div class="ctx-val" style="color:var(--amber)" id="rv-urg">—</div></div>'
     +'</div>'
-    +'<div class="sec"><div class="sec-title"><span class="dot" style="background:var(--purple);box-shadow:0 0 6px var(--purple)"></span>Maneuver Planner</div>'
+    +'<div class="sec"><div class="sec-title"><span class="dot" style="background:var(--purple);box-shadow:0 0 6px var(--purple)"></span>AI Maneuver Planner</div>'
+    +'<div style="font-family:var(--mono);font-size:.56rem;color:var(--t3);line-height:1.8;margin-bottom:10px;padding:8px 10px;background:rgba(170,95,255,.06);border:1px solid rgba(170,95,255,.15);border-radius:4px">'
+    +'The Genetic Algorithm will compute an optimal <span style="color:var(--cyan)">delta-v (&#916;v)</span> — '
+    +'a small rocket burn that changes the satellite orbit just enough to avoid the threat.'
+    +'</div>'
     +'<button class="action-btn" id="plan-btn" onclick="runPlanner('+idx+')">&#9654;&nbsp;&nbsp;RUN MANEUVER PLANNER</button>'
     +'<div id="mv-result"></div></div>';
-setTimeout(()=>{drawGeomDiagram(conj.miss_distance,conj.relative_velocity||0);startTcaCountdown(conj.tca_minutes_from_now);},80);
+setTimeout(()=>{
+    drawGeomDiagram(conj.miss_distance,conj.relative_velocity||0);
+    startTcaCountdown(conj.tca_minutes_from_now);
+    const sb=document.getElementById('scenario-box');
+    if(sb) sb.innerHTML=getRealScenarioText(conj);
+  },80);
 }
 
 function showManeuverResult(data){
@@ -1406,17 +1586,21 @@ function renderConjList(list){
   }
   el.innerHTML=filtered.map(c=>{
     const ri=list.indexOf(c);
-    return '<div class="ci" id="ci-'+ri+'" onclick="selectConj('+ri+')">'+
-      '<div class="ci-top"><span class="rb '+riskClass(c.risk_level)+'">'+c.risk_level+'</span>'+(c.is_synthetic?'<span class="synth">DEMO</span>':'')+
-      '</div>'+
-      '<div class="ci-names">'+(c.sat1_name||'').replace('DEMO','').trim()+'</div>'+
-      '<div style="font-family:var(--mono);font-size:0.58rem;color:var(--red);margin:1px 0 4px 0">'+
-      'THREAT: '+(c.sat2_name||'')+'</div>'+
-      '<div class="ci-meta">'+
-      '<div class="ci-m"><div class="mk">DIST</div><div class="mv">'+c.miss_distance.toFixed(1)+' km</div></div>'+
-      '<div class="ci-m"><div class="mk">TCA</div><div class="mv">'+fmtTCA(c.tca_minutes_from_now)+'</div></div>'+
-      '<div class="ci-m"><div class="mk">Pc</div><div class="mv">'+fmtPc(c.probability_of_collision)+'</div></div>'+
-      '</div></div>';
+    return '<div class="ci" id="ci-'+ri+'" onclick="selectConj('+ri+')">'
+    +'<div class="ci-row1">'
+    +'<span class="rp-pill '+riskClass(c.risk_level)+'"><span class="rp-dot"></span>'+c.risk_level+'</span>'
+    +(c.is_geo?'<span class="geo-tag">GEO</span>':'')
+    +(c.is_synthetic?'<span class="synth">DEMO</span>':'')
+    +'<span class="ci-sat1">'+(c.sat1_name||'').replace('DEMO','').trim().substring(0,20)+'</span>'
+    +'<span class="ci-arrow">&#8644;</span>'
+    +'<span class="ci-sat2">'+(c.sat2_name||'').substring(0,20)+'</span>'
+    +'</div>'
+    +'<div class="ci-row2">'
+    +'<span class="ci-m2"><span class="ci-mk">MISS</span> '+c.miss_distance.toFixed(1)+' km</span>'
+    +'<span class="ci-m2"><span class="ci-mk">TCA</span> '+fmtTCA(c.tca_minutes_from_now)+'</span>'
+    +'<span class="ci-m2"><span class="ci-mk">Pc</span> '+fmtPc(c.probability_of_collision)+'</span>'
+    +'</div>'
+    +'</div>'
   }).join('');
 }
 
@@ -1424,38 +1608,39 @@ function selectConj(idx){
   selectedIdx=idx;
   document.querySelectorAll('.ci').forEach(el=>el.classList.toggle('active',el.id==='ci-'+idx));
   showDetailBase(conjData[idx],idx);
+
+  // Highlight only the two involved satellites — dim all others
+  const conj=conjData[idx];
+  if(conj){ _highlightIds=new Set([conj.sat1_id,conj.sat2_id].filter(Boolean)); }
+
   fetch('/api/conjunction/'+idx).then(r=>r.json()).then(data=>{
-    // Update CDM source badge
-    const srcType = data.source_type || 'screened';
-    const badge   = document.getElementById('src-badge');
+    // CDM source badge
+    const srcType=data.source_type||'screened';
+    const badge=document.getElementById('src-badge');
     if(badge){
-      badge.className = 'cdm-badge '+(srcType==='cdm'?'official':'screened');
-      badge.innerHTML = '<div class="cdm-dot"></div>'+(srcType==='cdm'?'OFFICIAL CDM':'SGP4 SCREENED');
-      badge.title = data.data_source || '';
+      badge.className='ph-badge '+(srcType==='cdm'?'badge-cdm':'badge-sgp4');
+      badge.textContent=srcType==='cdm'?'OFFICIAL CDM':'SGP4';
     }
-    // If no paths available (CDM object not in TLE catalog)
-    if(data.error === 'no_paths' || !data.paths || !data.paths.satellite || data.paths.satellite.length === 0){
-      const btn = document.getElementById('plan-btn');
-      if(btn){
-        btn.disabled = true;
-        btn.textContent = 'NO TLE DATA — MANEUVER UNAVAILABLE';
-        btn.style.borderColor = 'var(--muted)';
-        btn.style.color = 'var(--muted)';
-      }
-      // Still show CDM info in right panel
+    // Check paths available
+    if(data.error==='no_paths'||!data.paths||!data.paths.satellite||data.paths.satellite.length===0){
+      const btn=document.getElementById('plan-btn');
+      if(btn){btn.disabled=true;btn.textContent='NO TLE DATA';btn.style.borderColor='var(--t3)';btn.style.color='var(--t3)';}
+      const msgEl=document.getElementById('mv-result');
+      if(msgEl) msgEl.innerHTML='<div style="font-family:var(--mono);font-size:.6rem;color:var(--amber);border:1px solid rgba(255,179,0,.3);padding:10px;border-radius:3px;margin-top:10px;line-height:1.8">Official CDM data.<br>No matching TLE for NORAD '+( conj.sat1_id||'?')+' / '+(conj.sat2_id||'?')+'.</div>';
       updateContextBars(data);
-      const msgEl = document.getElementById('mv-result');
-      if(msgEl) msgEl.innerHTML =
-        '<div style="font-family:var(--mono);font-size:0.6rem;color:var(--amber);'+
-        'border:1px solid rgba(255,179,0,0.3);padding:10px;border-radius:3px;margin-top:10px;line-height:1.8">'+
-        'This CDM conjunction comes from official Space-Track radar data.<br>'+
-        'However, no matching TLE was found for NORAD IDs '+
-        (conjData[idx].sat1_id||'?')+' / '+(conjData[idx].sat2_id||'?')+'.<br>'+
-        'The conjunction data (Pc, miss distance) is still valid official data.</div>';
       return;
     }
     renderPaths(data);
     updateContextBars(data);
+    // Re-render dots with highlight + start animated position
+    fetch('/api/globe').then(r=>r.json()).then(gd=>{
+      if(gd&&gd.objects){
+        renderDots(gd.objects);
+        startOrbitalAnimation(gd.objects);
+        // Add animated moving satellite along the orbit path
+        animateSatelliteOnPath(data);
+      }
+    }).catch(()=>{});
   }).catch(e=>console.error('selectConj:',e));
 }
 
@@ -1477,14 +1662,31 @@ function runPlanner(idx){
 
 function triggerRescan(){
   const btn=document.getElementById('rescan-btn');
-  if(btn){btn.textContent='...';btn.style.color='var(--amber)';}
-  fetch('/api/rescan').then(()=>{
-    initialized=false;
-    const loader=document.getElementById('loader');if(loader) loader.classList.remove('hidden');
-    clearConj();clearDots();conjData=[];selectedIdx=-1;
-    const rp=document.getElementById('rp-scroll');if(rp) rp.innerHTML=emptyPanel();
-    if(btn){btn.textContent='SCAN';btn.style.color='var(--muted)';}
-  }).catch(console.error);
+  if(btn){btn.textContent='...';btn.style.color='var(--amber)';btn.disabled=true;}
+  fetch('/api/status').then(r=>r.json()).then(s=>{
+    if(s.is_loading){
+      // Already scanning — don't trigger another one, just wait
+      if(btn){btn.textContent='SCANNING…';btn.style.color='var(--amber)';}
+      const check=setInterval(()=>{
+        fetch('/api/status').then(r=>r.json()).then(s2=>{
+          if(!s2.is_loading){
+            clearInterval(check);
+            loadAll();
+            if(btn){btn.textContent='SCAN';btn.style.color='var(--t3)';btn.disabled=false;}
+          }
+        });
+      },3000);
+      return;
+    }
+    fetch('/api/rescan').then(()=>{
+      clearConj();clearDots();conjData=[];selectedIdx=-1;_highlightIds=new Set();
+      _lastScanComplete=null; // force reload on next completion
+      const rp=document.getElementById('rp-scroll');if(rp) rp.innerHTML=emptyPanel();
+      if(btn){btn.textContent='SCAN';btn.style.color='var(--t3)';btn.disabled=false;}
+    }).catch(console.error);
+  }).catch(()=>{
+    if(btn){btn.textContent='SCAN';btn.style.color='var(--t3)';btn.disabled=false;}
+  });
 }
 
 /* TOPBAR */
@@ -1510,10 +1712,14 @@ function loadAll(){
     if(data.stats) afterLoadAll(data.stats,conjData);
     fetch('/api/risk_summary').then(r=>r.json()).then(rs=>{if(rs&&rs.counts) updateRiskChart(rs.counts);}).catch(()=>{});
     if(conjData.length>0&&selectedIdx<0){
-      // Find first conjunction where TCA hasn't passed
-      const firstValid = conjData.findIndex(c => c.tca_minutes_from_now > 5);
-      const useIdx = firstValid >= 0 ? firstValid : 0;
-      setTimeout(()=>{try{selectConj(useIdx);}catch(e){console.error(e);}},900);
+      // Find first conjunction with valid data (TCA not passed, miss_distance > 0)
+      const firstValid = conjData.findIndex(c =>
+        c.tca_minutes_from_now > 5 && c.miss_distance > 0.01
+      );
+      const useIdx = firstValid >= 0 ? firstValid : -1;
+      if(useIdx >= 0){
+        setTimeout(()=>{try{selectConj(useIdx);}catch(e){console.error(e);}},900);
+      }
     }
   }).catch(e=>console.error('loadAll:',e));
   fetch('/api/globe').then(r=>r.json()).then(data=>{if(data&&data.objects) renderDots(data.objects);}).catch(()=>{});
